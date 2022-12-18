@@ -3,15 +3,11 @@
 
 # usage: python3 ndscut.py < edge_list.txt
 
-from __future__ import print_function, unicode_literals,\
-    absolute_import, division
-
 import sys
 import networkx as nx
 from networkx.algorithms.connectivity import minimum_st_node_cut
 
 def minmax(e0, e1):
-#    return (min(e[0], e[1]), max(e[0], e[1]))
     return (min(e0, e1), max(e0, e1))
 
 def get_farthest_two_vertices(G):
@@ -75,9 +71,6 @@ def split_graph(G, s, t, left_vertex_set, right_vertex_set,
     #print "left =", left_vertex_set
     #print "right =", right_vertex_set
     #print "cut_set =", cut_set
-
-    #if len(right_vertex_set) >= 10:
-    #    exit(1)
 
     for v in left_vertex_set:
         if v != s and v != t:
@@ -411,17 +404,20 @@ if __name__ == '__main__':
     m2 = len(new_edge_list)
 
     if m1 != m2:
-        print("not isomorphic!", file = sys.stderr)
-    else:
-        if m1 <= 1000:
-            if not nx.is_isomorphic(G1, G2):
-                print("not isomorphic!", file = sys.stderr)
-                #exit(1)
-        else:
-            print("skip checking isomorphism because the graph has a lot of edges", file = sys.stderr)
+        print("The number of ordered edges is not equal to that of",
+              "original ones!", file = sys.stderr)
+        exit(1)
+    #else:
+    #    if m1 <= 1000:
+    #        if not nx.is_isomorphic(G1, G2):
+    #            print("not isomorphic!", file = sys.stderr)
+    #            #exit(1)
+    #    else:
+    #        print("skip checking isomorphism because the graph has
+    #               a lot of edges", file = sys.stderr)
+    #if not check_connected_order(new_edge_list):
+    #    print("not connected order", file = sys.stderr)
 
     for e in new_edge_list:
         c = minmax(e[0], e[1])
         print(c[0], c[1])
-    if not check_connected_order(new_edge_list):
-        print("not connected order", file = sys.stderr)
