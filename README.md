@@ -5,3 +5,8 @@
 
 グラフカットに基づく方法。グラフが小さいときは NDS を用いている。
 
+## usage
+
+```
+python3 ndscut.py < edge_list.txt
+```

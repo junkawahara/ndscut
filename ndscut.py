@@ -1,3 +1,11 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+# usage: python3 ndscut.py < edge_list.txt
+
+from __future__ import print_function, unicode_literals,\
+    absolute_import, division
+
 import sys
 import networkx as nx
 from networkx.algorithms.connectivity import minimum_st_node_cut
@@ -23,7 +31,7 @@ def get_farthest_two_vertices(G):
 def choose_next(G, vertex_order_dict, order_v_list):
     scores = [0] * len(order_v_list)
     for i in range(len(order_v_list)):
-        vs = G.neighbors(order_v_list[i])
+        vs = list(G.neighbors(order_v_list[i]))
         count = 0
         for v in vs:
             if vertex_order_dict[v] >= 1:
@@ -33,7 +41,7 @@ def choose_next(G, vertex_order_dict, order_v_list):
     for i in range(len(order_v_list)):
         if scores[i] == max_score:
             n_scores[i] = 0
-            vs = G.neighbors(order_v_list[i])
+            vs = list(G.neighbors(order_v_list[i]))
             for v in vs:
                 if vertex_order_dict[v] >= 1:
                     n_scores[i] += vertex_order_dict[v]
@@ -53,10 +61,11 @@ def order_by_NDS(G, vertex_order_dict, order_vertex_set, result_edge_list):
         order_v_list.remove(v)
         vertex_order_dict[v] = v_count
         v_count += 1
-        vs = G.neighbors(v)
+        vs = list(G.neighbors(v))
         for w in sorted(vs, key=(lambda x: vertex_order_dict[x])):
-            if vertex_order_dict[w] >= 1:
-                result_edge_list.append((v, w))
+            for i in range(G.number_of_edges(v, w)): # coping with parallel edges
+                if vertex_order_dict[w] >= 1:
+                    result_edge_list.append((v, w))
 
 def split_graph(G, s, t, left_vertex_set, right_vertex_set,
                 cut_set,
@@ -69,7 +78,7 @@ def split_graph(G, s, t, left_vertex_set, right_vertex_set,
 
     #if len(right_vertex_set) >= 10:
     #    exit(1)
-    
+
     for v in left_vertex_set:
         if v != s and v != t:
             H = nx.contracted_nodes(H, s, v)
@@ -138,7 +147,7 @@ def remove_deg12(G):
         found = False
         for n in G.nodes():
             if G.degree(n) == 1:
-                ns = G.neighbors(n)
+                ns = list(G.neighbors(n))
                 G.remove_node(n)
                 deg1_edges.append((ns[0], n))
                 found = True
@@ -151,7 +160,7 @@ def remove_deg12(G):
         return (G, deg1_edges, deg2_dict, deg2_cycle, False, True)
 
     #print "d", deg1_edges
-            
+
     found = True
     cycle = False
     while found:
@@ -159,23 +168,24 @@ def remove_deg12(G):
         for n in G.nodes():
             if G.degree(n) == 2:
                 walk = [n]
-                ns = G.neighbors(n)
-                #print n, ns
+                ns = list(G.neighbors(n))
+                #print(G.degree(n), n, ns)
                 c = ns[0]
                 walk.insert(0, c)
                 while G.degree(c) == 2:
                     if n == c:
                         return (G, deg1_edges, deg2_dict, deg2_cycle, True, False)
-                    nc = G.neighbors(c)
+                    nc = list(G.neighbors(c))
                     if nc[0] != walk[1]:
                         c = nc[0]
                     else:
                         c = nc[1]
                     walk.insert(0, c)
-                c = ns[1]
+                #c = ns[1]
+                c = ns[1] if len(ns) >= 2 else ns[0]
                 walk.append(c)
                 while G.degree(c) == 2:
-                    nc = G.neighbors(c)
+                    nc = list(G.neighbors(c))
                     if nc[0] != walk[-2]:
                         c = nc[0]
                     else:
@@ -233,11 +243,11 @@ def recover_deg12(deg1_edges, deg2_dict, deg2_cycle, result_edge_list):
             if e in deg2_dict:
                 found = True
                 #print "recover ", e
-                is_first = True
                 for x in deg2_dict[e]:
-                    if not x[1] and is_first:
-                        is_first = False
-                        result_edge_list.pop(i)
+                    if e in result_edge_list:
+                        result_edge_list.remove(e)
+                    else:
+                        result_edge_list.remove((e[1], e[0]))
                     touched_vertices = [y for l in result_edge_list[0:i] for y in l] # flatten
                     #print touched_vertices
                     if x[0][0] in touched_vertices:
@@ -257,10 +267,11 @@ def recover_deg12(deg1_edges, deg2_dict, deg2_cycle, result_edge_list):
                     if v in result_edge_list[i]:
                         #print "recover ", v
                         found = True
-                        for walk in deg2_cycle[v]:
-                            for j in range(len(walk) - 1):
-                                c0 = walk[j]
-                                c1 = walk[j + 1]
+                        for cy in deg2_cycle[v]:
+                            for j in range(len(cy) - 1):
+                                c0 = cy[j]
+                                c1 = cy[j + 1]
+                                #print "insert", c0, c1
                                 result_edge_list.insert(i + 1, minmax(c0, c1))
                         deg2_cycle.pop(v)
                         break # for i
@@ -281,20 +292,23 @@ def recover_deg12(deg1_edges, deg2_dict, deg2_cycle, result_edge_list):
                     break
             if found:
                 break
+        if not found:
+            print("not found error!")
+            exit(1)
 
 def get_order_by_cut(edge_list):
 
-    G = nx.Graph()
+    G = nx.MultiGraph()
     G.add_edges_from(edge_list)
 
     (H, deg1_edges, deg2_dict, deg2_cycle, is_cycle, is_tree) = remove_deg12(G)
 
     if is_cycle:
         #print "edges ", G.edges()
-        result_edge_list = get_cycle(G.edges())
+        result_edge_list = get_cycle(list(G.edges()))
         recover_deg12(deg1_edges, deg2_dict, deg2_cycle, result_edge_list)
     elif is_tree:
-        result_edge_list = G.edges()
+        result_edge_list = list(G.edges())
         recover_deg12(deg1_edges, deg2_dict, deg2_cycle, result_edge_list)
     else:
         G = H
@@ -317,47 +331,97 @@ def get_order_by_cut(edge_list):
         #return split_graph(G, [s], edge_list, [t])
 
         recover_deg12(deg1_edges, deg2_dict, deg2_cycle, result_edge_list)
-        
+
     return result_edge_list
 
 def get_order_by_cut_with_check(edge_list):
 
-    new_edge_list = get_order_by_cut(edge_list)
+    result_edge_list = get_order_by_cut(edge_list)
 
-    G1 = nx.Graph()
-    G2 = nx.Graph()
+    # check start
+    G1 = nx.MultiGraph()
+    G2 = nx.MultiGraph()
+
+    #for e in edge_list:
+    #    G1.add_edge(*minmax(e[0], e[1]))
+    #for e in result_edge_list:
+    #    G2.add_edge(*minmax(e[0], e[1]))
 
     G1.add_edges_from(edge_list)
-    G2.add_edges_from(new_edge_list)
+    G2.add_edges_from(result_edge_list)
 
     if not nx.is_isomorphic(G1, G2):
         sys.stderr.write("not isomorphic!")
-        #exit(1)
+        #print "G1 =", edge_list
+        #print "G2 =", result_edge_list
+        print("G1 =", G1.edges())
+        print("G2 =", G2.edges())
 
-    if not check_connected_order(new_edge_list):
+        s1 = []
+        s2 = []
+        for e in edge_list:
+            s1.append(minmax(e[0], e[1]))
+        for e in result_edge_list:
+            s2.append(minmax(e[0], e[1]))
+        ss1 = set(s1)
+        ss2 = set(s2)
+
+        print("ss1 - ss2 =", (ss1 - ss2))
+        print("ss2 - ss1 =", (ss2 - ss1))
+
+        exit(1)
+
+    #for e in result_edge_list:
+    #    c = minmax(e[0], e[1])
+    #    print c[0], c[1]
+    if not check_connected_order(result_edge_list):
         sys.stderr.write("not connected order")
+        exit(1)
+    # check end
 
-    return new_edge_list
+    return result_edge_list
+
 
 if __name__ == '__main__':
 
     edge_list = []
 
     for line in sys.stdin:
-        ar = line.strip().split()
-        if len(ar) < 2:
-            print "Each edge must have two vertices!", line.strip(),
-            "does not."
-            exit(1)
-        edge_list.append((int(ar[0]), int(ar[1])))
+        if not line.startswith('#'):
+            ar = line.strip().split()
+            if len(ar) < 2:
+                print("Each edge must have two vertices! " + line.strip() +
+                        " does not.", file = sys.stderr)
+                exit(1)
+            edge_list.append((int(ar[0]), int(ar[1])))
 
     if len(edge_list) == 0:
-        print "The input graph is empty."
+        print("The input graph is empty.")
         exit(1)
 
-    new_edge_list = get_order_by_cut_with_check(edge_list)
+    new_edge_list = get_order_by_cut(edge_list)
+
+    G1 = nx.MultiGraph()
+    G2 = nx.MultiGraph()
+
+    G1.add_edges_from(edge_list)
+    G2.add_edges_from(new_edge_list)
+
+    m1 = len(edge_list)
+    m2 = len(new_edge_list)
+
+    if m1 != m2:
+        print("not isomorphic!", file = sys.stderr)
+    else:
+        if m1 <= 1000:
+            if not nx.is_isomorphic(G1, G2):
+                print("not isomorphic!", file = sys.stderr)
+                #exit(1)
+        else:
+            print("skip checking isomorphism because the graph has a lot of edges", file = sys.stderr)
 
     for e in new_edge_list:
         c = minmax(e[0], e[1])
-        print c[0], c[1]
-
+        print(c[0], c[1])
+    if not check_connected_order(new_edge_list):
+        print("not connected order", file = sys.stderr)
