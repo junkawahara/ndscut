@@ -377,16 +377,32 @@ def get_order_by_cut_with_check(edge_list):
 
 if __name__ == '__main__':
 
+    is_dimacs_format = False
+    if '-d' in sys.argv:
+        is_dimacs_format = True
+
     edge_list = []
+    other_lines = []
 
     for line in sys.stdin:
         if not line.startswith('#'):
-            ar = line.strip().split()
-            if len(ar) < 2:
-                print("Each edge must have two vertices! " + line.strip() +
-                        " does not.", file = sys.stderr)
-                exit(1)
-            edge_list.append((int(ar[0]), int(ar[1])))
+            if is_dimacs_format:
+                if line.startswith('e '):
+                    ar = line.strip().split()
+                    if len(ar) < 2:
+                        print("Each edge must have two vertices! " + line.strip() +
+                            " does not.", file = sys.stderr)
+                        exit(1)
+                    edge_list.append((int(ar[1]), int(ar[2])))
+                else:
+                    other_lines.append(line.strip())
+            else:
+                ar = line.strip().split()
+                if len(ar) < 2:
+                    print("Each edge must have two vertices! " + line.strip() +
+                            " does not.", file = sys.stderr)
+                    exit(1)
+                edge_list.append((int(ar[0]), int(ar[1])))
 
     if len(edge_list) == 0:
         print("The input graph is empty.")
@@ -418,6 +434,13 @@ if __name__ == '__main__':
     #if not check_connected_order(new_edge_list):
     #    print("not connected order", file = sys.stderr)
 
-    for e in new_edge_list:
-        c = minmax(e[0], e[1])
-        print(c[0], c[1])
+    if is_dimacs_format:
+        for line in other_lines:
+            print(line)
+        for e in new_edge_list:
+            c = minmax(e[0], e[1])
+            print('e', c[0], c[1])
+    else:
+        for e in new_edge_list:
+            c = minmax(e[0], e[1])
+            print(c[0], c[1])

@@ -37,3 +37,5 @@ Example:
 2 3
 2 4
 ```
+
+The program can read/write the input in the DIMACS format if you run it with '-d' option.
